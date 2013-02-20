@@ -439,7 +439,7 @@ def Revert(in_folder, in_filename):
     return PerforceCommandOnFile("revert", in_folder, in_filename);
 
 class PerforceRevertCommand(sublime_plugin.TextCommand):
-    def run_(self, args): # revert cannot be called when an Edit object exists, manually handle the run routine
+    def run_(self, edit, args): # revert cannot be called when an Edit object exists, manually handle the run routine
         if(self.view.file_name()):
             folder_name, filename = os.path.split(self.view.file_name())
 
