@@ -84,7 +84,7 @@ def GetUserFromClientspec():
     result, err = p.communicate()
 
     if(err):
-        WarnUser("usererr " + err.strip())
+        WarnUser("usererr " + err.decode().strip())
         return -1
 
     resultStr = result.decode()
@@ -111,7 +111,7 @@ def GetClientRoot(in_dir):
     resultStr = result.decode()
 
     if(err):
-        WarnUser(err.strip())
+        WarnUser(err.decode().strip())
         return -1
 
     # locate the line containing "Client root: " and extract the following path
@@ -240,7 +240,7 @@ def PerforceCommandOnFile(in_command, in_folder, in_filename):
     if(not err):
         return 1, result.decode().strip()
     else:
-        return 0, err.strip()
+        return 0, err.decode().strip()
 
 def WarnUser(message):
     perforce_settings = sublime.load_settings('Perforce.sublime-settings')
@@ -375,7 +375,7 @@ def Rename(in_filename, in_newname):
     result, err = p.communicate()
 
     if(err):
-        return 0, err.strip()
+        return 0, err.decode().strip()
 
     command = ConstructCommand('p4 delete "' + in_filename + '" "' + in_newname + '"')
     p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=global_folder, shell=True)
@@ -384,7 +384,7 @@ def Rename(in_filename, in_newname):
     if(not err):
         return 1, result.strip()
     else:
-        return 0, err.strip()
+        return 0, err.decode().strip()
 
 class PerforceRenameCommand(sublime_plugin.WindowCommand):
     def run(self):
@@ -1020,7 +1020,7 @@ class ShelveClCommand(threading.Thread):
         result, err = p.communicate()
 
         if(err):
-            WarnUser("usererr " + err.strip())
+            WarnUser("usererr " + err.decode().strip())
             return -1
 
     def MakeChangelistsList(self):
