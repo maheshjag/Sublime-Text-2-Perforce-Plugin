@@ -82,40 +82,40 @@ def GetUserFromClientspec():
     command = ConstructCommand('p4 info')
     p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=global_folder, shell=True)
     result, err = p.communicate()
+    result = result.decode('utf-8')
 
     if(err):
-        WarnUser("usererr " + err.decode().strip())
+        WarnUser("usererr " + err.strip())
         return -1
 
-    resultStr = result.decode()
     # locate the line containing "User name: " and extract the following name
-    startindex = resultStr.find("User name: ")
+    startindex = result.find("User name: ")
     if(startindex == -1):
         WarnUser("Unexpected output from 'p4 info'.")
         return -1
 
     startindex += 11 # advance after 'User name: '
 
-    endindex = resultStr.find("\n", startindex)
+    endindex = result.find("\n", startindex)
     if(endindex == -1):
         WarnUser("Unexpected output from 'p4 info'.")
         return -1
 
-    return resultStr[startindex:endindex].strip();
+    return result[startindex:endindex].strip();
 
 def GetClientRoot(in_dir):
     # check if the file is in the depot
     command = ConstructCommand('p4 info')
     p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=global_folder, shell=True)
     result, err = p.communicate()
-    resultStr = result.decode()
+    result = result.decode('utf-8')
 
     if(err):
-        WarnUser(err.decode().strip())
+        WarnUser(err.strip())
         return -1
 
     # locate the line containing "Client root: " and extract the following path
-    startindex = resultStr.find("Client root: ")
+    startindex = result.find("Client root: ")
     if(startindex == -1):
         # sometimes the clientspec is not displayed
         sublime.error_message("Perforce Plugin: p4 info didn't supply a valid clientspec, launching p4 client");
@@ -126,13 +126,13 @@ def GetClientRoot(in_dir):
 
     startindex += 13 # advance after 'Client root: '
 
-    endindex = resultStr.find("\n", startindex)
+    endindex = result.find("\n", startindex)
     if(endindex == -1):
         WarnUser("Unexpected output from 'p4 info'.")
         return -1
 
     # convert all paths to "os.sep" slashes
-    convertedclientroot = resultStr[startindex:endindex].strip().replace('\\', os.sep).replace('/', os.sep)
+    convertedclientroot = result[startindex:endindex].strip().replace('\\', os.sep).replace('/', os.sep)
 
     return convertedclientroot
 
@@ -144,6 +144,8 @@ def IsFolderUnderClientRoot(in_folder):
         return 0
 
     clientroot = clientroot.lower()
+    if(clientroot == "null"):
+        return 1
 
     # convert all paths to "os.sep" slashes
     convertedfolder = in_folder.lower().replace('\\', os.sep).replace('/', os.sep);
@@ -177,6 +179,7 @@ def GetPendingChangelists():
 
     p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=global_folder, shell=True)
     result, err = p.communicate()
+    result = result.decode('utf-8')
     if(not err):
         return 1, result
     return 0, result
@@ -186,9 +189,10 @@ def AppendToChangelistDescription(changelist, input):
     command = ConstructCommand('p4 change -o ' + changelist)
     p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=global_folder, shell=True)
     result, err = p.communicate()
+    result = result.decode('utf-8')
 
     if(err):
-        return 0, err
+        return 0, err.decode('utf-8')
 
     # Find the description field and modify it
     lines = result.splitlines()
@@ -230,7 +234,7 @@ def AppendToChangelistDescription(changelist, input):
     if(err):
         return 0, err
 
-    return 1, result
+    return 1, result.decode('utf-8')
 
 def PerforceCommandOnFile(in_command, in_folder, in_filename):
     command = ConstructCommand('p4 ' + in_command + ' "' + in_filename + '"')
@@ -238,9 +242,9 @@ def PerforceCommandOnFile(in_command, in_folder, in_filename):
     result, err = p.communicate()
 
     if(not err):
-        return 1, result.decode().strip()
+        return 1, result.decode('utf-8').strip()
     else:
-        return 0, err.decode().strip()
+        return 0, err.decode('utf-8').strip()
 
 def WarnUser(message):
     perforce_settings = sublime.load_settings('Perforce.sublime-settings')
@@ -375,16 +379,16 @@ def Rename(in_filename, in_newname):
     result, err = p.communicate()
 
     if(err):
-        return 0, err.decode().strip()
+        return 0, err.decode('utf-8').strip()
 
     command = ConstructCommand('p4 delete "' + in_filename + '" "' + in_newname + '"')
     p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=global_folder, shell=True)
     result, err = p.communicate()
 
     if(not err):
-        return 1, result.strip()
+        return 1, result.decode('utf-8').strip()
     else:
-        return 0, err.decode().strip()
+        return 0, err.decode('utf-8').strip()
 
 class PerforceRenameCommand(sublime_plugin.WindowCommand):
     def run(self):
@@ -439,7 +443,7 @@ def Revert(in_folder, in_filename):
     return PerforceCommandOnFile("revert", in_folder, in_filename);
 
 class PerforceRevertCommand(sublime_plugin.TextCommand):
-    def run_(self, edit, args): # revert cannot be called when an Edit object exists, manually handle the run routine
+    def run_(self, args): # revert cannot be called when an Edit object exists, manually handle the run routine
         if(self.view.file_name()):
             folder_name, filename = os.path.split(self.view.file_name())
 
@@ -583,6 +587,9 @@ class ListCheckedOutFilesThread(threading.Thread):
         if(clientroot == -1):
             return 0
 
+        if(clientroot == "null"):
+            return in_filename
+
         filename = clientroot + os.sep + in_filename.replace('\\', os.sep).replace('/', os.sep)
 
         return filename
@@ -594,6 +601,7 @@ class ListCheckedOutFilesThread(threading.Thread):
         command = ConstructCommand('p4 opened -c ' + in_changelistline[1] + ' -u ' + currentuser)
         p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=global_folder, shell=True)
         result, err = p.communicate()
+        result = result.decode('utf-8')
         if(not err):
             lines = result.splitlines()
             for line in lines:
@@ -626,6 +634,7 @@ class ListCheckedOutFilesThread(threading.Thread):
 
         p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=global_folder, shell=True)
         result, err = p.communicate()
+        result = result.decode('utf-8')
 
         if(not err):
             changelists = result.splitlines()
@@ -667,12 +676,16 @@ def CreateChangelist(description):
     command = ConstructCommand('p4 change -o')
     p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=global_folder, shell=True)
     result, err = p.communicate()
+    result = result.decode('utf-8')
 
     if(err):
-        return 0, err
+        return 0, err.decode('utf-8')
 
     # Find the description field and modify it
-    result = result.replace("<enter description here>", description)
+    desclabel = 'Description:' + os.linesep
+    descindex = result.find(desclabel) + len(desclabel)
+    descend = result.find(os.linesep*2, descindex)
+    result = result[0:descindex] + '\t' + description + result[descend:]
 
     # Remove all files from the query, we want them to stay in Default
     filesindex = result.rfind("Files:")
@@ -695,9 +708,9 @@ def CreateChangelist(description):
     os.unlink(temp_changelist_description_file.name)
 
     if(err):
-        return 0, err
+        return 0, err.decode('utf-8')
 
-    return 1, result
+    return 1, result.decode('utf-8')
 
 class PerforceCreateChangelistCommand(sublime_plugin.WindowCommand):
     def run(self):
@@ -724,9 +737,9 @@ def MoveFileToChangelist(in_filename, in_changelist):
     result, err = p.communicate()
 
     if(err):
-        return 0, err
+        return 0, err.decode('utf-8')
 
-    return 1, result
+    return 1, result.decode('utf-8')
 
 class ListChangelistsAndMoveFileThread(threading.Thread):
     def __init__(self, window):
@@ -1020,7 +1033,7 @@ class ShelveClCommand(threading.Thread):
         result, err = p.communicate()
 
         if(err):
-            WarnUser("usererr " + err.decode().strip())
+            WarnUser("usererr " + err.decode('utf-8').strip())
             return -1
 
     def MakeChangelistsList(self):
